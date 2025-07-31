@@ -57,6 +57,17 @@ jobs:
           
           echo "🚀 Starting deployment process..."
           
+          # Install required system packages
+          echo "📦 Installing system packages..."
+          sudo yum update -y
+          sudo yum install -y git python3 python3-pip
+          
+          # Verify installations
+          echo "🔍 Verifying installations..."
+          git --version
+          python3 --version
+          pip3 --version || echo "pip3 not found, will use python3 -m pip"
+          
           # Stop existing Django application
           echo "⏹️ Stopping existing Django application..."
           pkill -f "python.*manage.py.*runserver" || true
@@ -84,16 +95,20 @@ jobs:
           # Activate virtual environment
           source venv/bin/activate
           
+          # Verify we're in the virtual environment
+          which python
+          which pip
+          
           # Upgrade pip
           echo "📦 Upgrading pip..."
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           
           # Install dependencies
           echo "📚 Installing dependencies..."
-          pip install -r requirements.txt
+          python -m pip install -r requirements.txt
           
           # Install additional production packages
-          pip install gunicorn whitenoise
+          python -m pip install gunicorn whitenoise
           
           # Create .env file with secrets
           echo "🔐 Setting up environment variables..."
