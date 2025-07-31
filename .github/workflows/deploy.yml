@@ -25,14 +25,12 @@ jobs:
     
     - name: Run Django tests
       run: |
-        cd myproject
         python manage.py test
       env:
         DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
     
     - name: Check Django deployment readiness
       run: |
-        cd myproject
         python manage.py check --deploy
       env:
         DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
@@ -72,9 +70,7 @@ jobs:
           # Clone the repository
           echo "📥 Cloning repository..."
           cd ~
-          git clone https://github.com/${{ github.repository }}.git temp_repo
-          cp -r temp_repo/myproject ~/myproject
-          rm -rf temp_repo
+          git clone https://github.com/${{ github.repository }}.git myproject
           
           # Navigate to project directory
           cd ~/myproject
@@ -94,7 +90,7 @@ jobs:
           
           # Install dependencies
           echo "📚 Installing dependencies..."
-          pip install -r ../requirements.txt
+          pip install -r requirements.txt
           
           # Install additional production packages
           pip install gunicorn whitenoise
