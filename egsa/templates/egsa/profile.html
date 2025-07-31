@@ -1,0 +1,337 @@
+{% extends 'egsa/base.html' %}
+
+{% block title %}Profile - EGSA{% endblock %}
+
+{% block page_title %}
+<i class="fas fa-user text-primary"></i>
+User Profile
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Profile Information -->
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-user-edit me-2"></i>Profile Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="first_name" class="form-label">First Name</label>
+                            <input type="text" class="form-control" id="first_name" name="first_name" 
+                                   value="{{ user.first_name }}" placeholder="Enter first name">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="last_name" class="form-label">Last Name</label>
+                            <input type="text" class="form-control" id="last_name" name="last_name" 
+                                   value="{{ user.last_name }}" placeholder="Enter last name">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email Address</label>
+                        <input type="email" class="form-control" id="email" name="email" 
+                               value="{{ user.email }}" placeholder="Enter email address">
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Used for report notifications and AWS SES integration
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="phone" class="form-label">Phone Number</label>
+                            <input type="tel" class="form-control" id="phone" name="phone" 
+                                   value="{{ profile.phone }}" placeholder="Enter phone number">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="department" class="form-label">Department</label>
+                            <input type="text" class="form-control" id="department" name="department" 
+                                   value="{{ profile.department }}" placeholder="Enter department">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="notifications" name="notifications" 
+                                   {% if profile.notification_preferences %}checked{% endif %}>
+                            <label class="form-check-label" for="notifications">
+                                <i class="fas fa-bell me-1"></i>
+                                Enable Email Notifications
+                            </label>
+                            <div class="form-text">
+                                Receive monthly reports and usage alerts via email
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-info">
+                            <i class="fas fa-save me-2"></i>Update Profile
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Profile Statistics -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-chart-pie me-2"></i>Your Statistics
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-3">
+                    <i class="fas fa-user-circle fa-4x text-muted"></i>
+                    <h5 class="mt-2">{{ user.get_full_name|default:user.username }}</h5>
+                    <small class="text-muted">{{ profile.department|default:"EGSA User" }}</small>
+                </div>
+                
+                <hr>
+                
+                <div class="row text-center mb-3">
+                    <div class="col-6">
+                        <h4 class="text-primary">{{ total_readings }}</h4>
+                        <small class="text-muted">Total Readings</small>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-success">${{ total_cost|floatformat:2 }}</h4>
+                        <small class="text-muted">Total Cost</small>
+                    </div>
+                </div>
+                
+                <div class="row text-center">
+                    <div class="col-12">
+                        <small class="text-muted">Member since {{ user.date_joined|date:"M Y" }}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Account Information -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Account Details
+                </h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2">
+                        <strong>Username:</strong> {{ user.username }}
+                    </li>
+                    <li class="mb-2">
+                        <strong>Last Login:</strong> 
+                        {% if user.last_login %}
+                        {{ user.last_login|date:"M d, Y g:i A" }}
+                        {% else %}
+                        Never
+                        {% endif %}
+                    </li>
+                    <li class="mb-2">
+                        <strong>Account Status:</strong> 
+                        {% if user.is_active %}
+                        <span class="badge bg-success">Active</span>
+                        {% else %}
+                        <span class="badge bg-danger">Inactive</span>
+                        {% endif %}
+                    </li>
+                    <li class="mb-2">
+                        <strong>Notifications:</strong> 
+                        {% if profile.notification_preferences %}
+                        <span class="badge bg-info">Enabled</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Disabled</span>
+                        {% endif %}
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- AWS Integration Status -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fab fa-aws text-warning me-2"></i>AWS Features
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <div>
+                            <i class="fab fa-aws text-warning me-2"></i>
+                            <small>S3 File Storage</small>
+                        </div>
+                        <span class="badge bg-success">✓</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <div>
+                            <i class="fas fa-database text-primary me-2"></i>
+                            <small>RDS MySQL</small>
+                        </div>
+                        <span class="badge bg-success">✓</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <div>
+                            <i class="fas fa-envelope text-info me-2"></i>
+                            <small>SES Email</small>
+                        </div>
+                        <span class="badge bg-success">✓</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <div>
+                            <i class="fas fa-bell text-warning me-2"></i>
+                            <small>SNS Notifications</small>
+                        </div>
+                        <span class="badge bg-success">✓</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <div>
+                            <i class="fas fa-chart-line text-secondary me-2"></i>
+                            <small>CloudWatch</small>
+                        </div>
+                        <span class="badge bg-success">✓</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+{% if recent_readings %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-history me-2"></i>Recent Activity
+                </h5>
+                <a href="{% url 'utility_management' %}" class="btn btn-sm btn-outline-primary">
+                    View All Readings
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Value</th>
+                                <th>Cost</th>
+                                <th>Date</th>
+                                <th>Location</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for reading in recent_readings %}
+                            <tr>
+                                <td>
+                                    {% if reading.utility_type == 'electricity' %}
+                                        <i class="fas fa-bolt text-warning me-1"></i>
+                                    {% elif reading.utility_type == 'gas' %}
+                                        <i class="fas fa-fire text-danger me-1"></i>
+                                    {% elif reading.utility_type == 'steam' %}
+                                        <i class="fas fa-cloud text-secondary me-1"></i>
+                                    {% elif reading.utility_type == 'air_conditioning' %}
+                                        <i class="fas fa-snowflake text-info me-1"></i>
+                                    {% endif %}
+                                    {{ reading.get_utility_type_display }}
+                                </td>
+                                <td>{{ reading.reading_value }} {{ reading.unit }}</td>
+                                <td class="text-success">${{ reading.cost|floatformat:2 }}</td>
+                                <td>{{ reading.reading_date|date:"M d, Y" }}</td>
+                                <td>{{ reading.location }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Custom Library Information -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-cogs me-2"></i>EGSA Calculator Library
+                </h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-3">
+                    This application uses our custom <strong>EGSA Calculator Library</strong> - an object-oriented 
+                    utility management system built specifically for electricity, gas, steam, and air conditioning calculations.
+                </p>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Features:</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>Real-time cost calculations</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Efficiency rating algorithms</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Environmental impact analysis</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Usage recommendations</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Specialized Calculators:</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-bolt text-warning me-2"></i>ElectricityCalculator</li>
+                            <li><i class="fas fa-fire text-danger me-2"></i>GasCalculator</li>
+                            <li><i class="fas fa-cloud text-secondary me-2"></i>SteamCalculator</li>
+                            <li><i class="fas fa-snowflake text-info me-2"></i>AirConditioningCalculator</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Phone number formatting
+    const phoneInput = document.getElementById('phone');
+    phoneInput.addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\D/g, '');
+        if (value.length >= 6) {
+            value = value.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
+        } else if (value.length >= 3) {
+            value = value.replace(/(\d{3})(\d{3})/, '($1) $2');
+        }
+        e.target.value = value;
+    });
+    
+    // Form validation
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(e) {
+        const email = document.getElementById('email').value;
+        if (email && !isValidEmail(email)) {
+            e.preventDefault();
+            alert('Please enter a valid email address');
+            return false;
+        }
+    });
+    
+    function isValidEmail(email) {
+        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return re.test(email);
+    }
+});
+</script>
+{% endblock %}

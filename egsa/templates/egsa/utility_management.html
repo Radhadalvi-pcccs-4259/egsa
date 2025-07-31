@@ -1,0 +1,319 @@
+{% extends 'egsa/base.html' %}
+
+{% block title %}Utility Management - EGSA{% endblock %}
+
+{% block page_title %}
+<i class="fas fa-cogs text-primary"></i>
+Utility Management
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Add New Reading Form -->
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-plus me-2"></i>Add New Reading
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="utility_type" class="form-label">Utility Type</label>
+                        <select class="form-select" id="utility_type" name="utility_type" required>
+                            <option value="">Select Utility</option>
+                            {% for type_code, type_name in utility_types %}
+                            <option value="{{ type_code }}">{{ type_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="reading_value" class="form-label">Reading Value</label>
+                        <input type="number" class="form-control" id="reading_value" name="reading_value" 
+                               step="0.01" min="0" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="unit" class="form-label">Unit</label>
+                        <select class="form-select" id="unit" name="unit">
+                            <option value="kWh">kWh (Electricity)</option>
+                            <option value="cubic_meter">Cubic Meter (Gas)</option>
+                            <option value="pounds">Pounds (Steam)</option>
+                            <option value="BTU">BTU (A/C)</option>
+                            <option value="kWh">kWh (A/C)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="location" class="form-label">Location</label>
+                        <input type="text" class="form-control" id="location" name="location" 
+                               value="Main Building" placeholder="Building/Room location">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notes (Optional)</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                  placeholder="Additional notes or observations"></textarea>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Add Reading
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Quick Stats
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <h4 class="text-primary">{{ readings.paginator.count }}</h4>
+                        <small class="text-muted">Total Readings</small>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-success">This Month</h4>
+                        <small class="text-muted">Current Period</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Readings List -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-list me-2"></i>Utility Readings
+                </h5>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" onclick="location.reload()">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if readings %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Value</th>
+                                <th>Cost</th>
+                                <th>Date</th>
+                                <th>Location</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for reading in readings %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% if reading.utility_type == 'electricity' %}
+                                            <i class="fas fa-bolt text-warning me-2"></i>
+                                        {% elif reading.utility_type == 'gas' %}
+                                            <i class="fas fa-fire text-danger me-2"></i>
+                                        {% elif reading.utility_type == 'steam' %}
+                                            <i class="fas fa-cloud text-secondary me-2"></i>
+                                        {% elif reading.utility_type == 'air_conditioning' %}
+                                            <i class="fas fa-snowflake text-info me-2"></i>
+                                        {% endif %}
+                                        {{ reading.get_utility_type_display }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <strong>{{ reading.reading_value }}</strong> {{ reading.unit }}
+                                </td>
+                                <td class="text-success">
+                                    <strong>${{ reading.cost|floatformat:2 }}</strong>
+                                </td>
+                                <td>
+                                    {{ reading.reading_date|date:"M d, Y" }}<br>
+                                    <small class="text-muted">{{ reading.reading_date|time:"g:i A" }}</small>
+                                </td>
+                                <td>
+                                    {{ reading.location }}
+                                    {% if reading.notes %}
+                                    <br><small class="text-muted">{{ reading.notes|truncatechars:30 }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'edit_reading' reading.id %}" 
+                                           class="btn btn-outline-primary btn-sm" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="{% url 'delete_reading' reading.id %}" 
+                                           class="btn btn-outline-danger btn-sm" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination -->
+                {% if readings.has_other_pages %}
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if readings.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ readings.previous_page_number }}">
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for num in readings.paginator.page_range %}
+                        {% if num == readings.number %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                        {% elif num > readings.number|add:'-3' and num < readings.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                        </li>
+                        {% endif %}
+                        {% endfor %}
+                        
+                        {% if readings.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ readings.next_page_number }}">
+                                Next <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+                
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                    <h5>No utility readings yet</h5>
+                    <p class="text-muted">Add your first utility reading using the form on the left</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Utility Type Icons and Cost Calculation Info -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-calculator me-2"></i>Utility Information & Rates
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center p-3 border rounded">
+                            <i class="fas fa-bolt fa-2x text-warning mb-2"></i>
+                            <h6>Electricity</h6>
+                            <small class="text-muted">$0.12/kWh</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center p-3 border rounded">
+                            <i class="fas fa-fire fa-2x text-danger mb-2"></i>
+                            <h6>Gas</h6>
+                            <small class="text-muted">$0.45/m³</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center p-3 border rounded">
+                            <i class="fas fa-cloud fa-2x text-secondary mb-2"></i>
+                            <h6>Steam</h6>
+                            <small class="text-muted">$0.025/lb</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center p-3 border rounded">
+                            <i class="fas fa-snowflake fa-2x text-info mb-2"></i>
+                            <h6>Air Conditioning</h6>
+                            <small class="text-muted">$0.15/kWh</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-center mt-3">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Costs are calculated automatically using our EGSA Calculator Library. 
+                        Rates may vary based on usage patterns and peak hours.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-update unit field based on utility type
+    const utilityTypeSelect = document.getElementById('utility_type');
+    const unitSelect = document.getElementById('unit');
+    
+    utilityTypeSelect.addEventListener('change', function() {
+        const utilityType = this.value;
+        let defaultUnit = 'kWh';
+        
+        switch(utilityType) {
+            case 'electricity':
+                defaultUnit = 'kWh';
+                break;
+            case 'gas':
+                defaultUnit = 'cubic_meter';
+                break;
+            case 'steam':
+                defaultUnit = 'pounds';
+                break;
+            case 'air_conditioning':
+                defaultUnit = 'kWh';
+                break;
+        }
+        
+        // Set the unit select to the appropriate default
+        for (let option of unitSelect.options) {
+            if (option.value === defaultUnit) {
+                option.selected = true;
+                break;
+            }
+        }
+    });
+    
+    // Form validation
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(e) {
+        const readingValue = document.getElementById('reading_value').value;
+        
+        if (parseFloat(readingValue) <= 0) {
+            e.preventDefault();
+            alert('Reading value must be greater than 0');
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}

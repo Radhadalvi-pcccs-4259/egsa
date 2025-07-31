@@ -1,0 +1,84 @@
+{% extends 'egsa/base.html' %}
+
+{% block title %}Edit Reading - EGSA{% endblock %}
+
+{% block page_title %}
+<i class="fas fa-edit text-primary"></i>
+Edit Utility Reading
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-edit me-2"></i>Edit Reading
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="utility_type" class="form-label">Utility Type</label>
+                        <select class="form-select" id="utility_type" name="utility_type" required>
+                            {% for type_code, type_name in utility_types %}
+                            <option value="{{ type_code }}" {% if reading.utility_type == type_code %}selected{% endif %}>
+                                {{ type_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="reading_value" class="form-label">Reading Value</label>
+                        <input type="number" class="form-control" id="reading_value" name="reading_value" 
+                               step="0.01" min="0" value="{{ reading.reading_value }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="unit" class="form-label">Unit</label>
+                        <select class="form-select" id="unit" name="unit">
+                            <option value="kWh" {% if reading.unit == 'kWh' %}selected{% endif %}>kWh</option>
+                            <option value="cubic_meter" {% if reading.unit == 'cubic_meter' %}selected{% endif %}>Cubic Meter</option>
+                            <option value="pounds" {% if reading.unit == 'pounds' %}selected{% endif %}>Pounds</option>
+                            <option value="BTU" {% if reading.unit == 'BTU' %}selected{% endif %}>BTU</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="location" class="form-label">Location</label>
+                        <input type="text" class="form-control" id="location" name="location" 
+                               value="{{ reading.location }}" placeholder="Building/Room location">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3">{{ reading.notes }}</textarea>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Update Reading
+                        </button>
+                        <a href="{% url 'utility_management' %}" class="btn btn-secondary">
+                            <i class="fas fa-times me-2"></i>Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-body">
+                <h6>Current Details:</h6>
+                <ul class="list-unstyled">
+                    <li><strong>Original Cost:</strong> ${{ reading.cost|floatformat:2 }}</li>
+                    <li><strong>Created:</strong> {{ reading.created_at|date:"M d, Y g:i A" }}</li>
+                    <li><strong>Last Updated:</strong> {{ reading.updated_at|date:"M d, Y g:i A" }}</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

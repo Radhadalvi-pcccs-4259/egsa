@@ -1,0 +1,272 @@
+{% extends 'egsa/base.html' %}
+
+{% block title %}Dashboard - EGSA{% endblock %}
+
+{% block page_title %}
+<i class="fas fa-tachometer-alt text-primary"></i>
+Dashboard
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Welcome Card -->
+    <div class="col-12 mb-4">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <h4 class="card-title mb-0">
+                            <i class="fas fa-home me-2"></i>
+                            Welcome back, {{ user.get_full_name|default:user.username }}!
+                        </h4>
+                        <p class="card-text mt-2">
+                            Monitor and manage your electricity, gas, steam, and air conditioning utilities
+                        </p>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-bolt fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Monthly Statistics -->
+    {% for stat in monthly_stats %}
+    <div class="col-md-6 col-lg-3 mb-4">
+        <div class="card utility-card {{ stat.utility_type }}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title text-muted mb-1">
+                            {% if stat.utility_type == 'electricity' %}
+                                <i class="fas fa-bolt"></i> Electricity
+                            {% elif stat.utility_type == 'gas' %}
+                                <i class="fas fa-fire"></i> Gas
+                            {% elif stat.utility_type == 'steam' %}
+                                <i class="fas fa-cloud"></i> Steam
+                            {% elif stat.utility_type == 'air_conditioning' %}
+                                <i class="fas fa-snowflake"></i> A/C
+                            {% endif %}
+                        </h6>
+                        <h4 class="mb-0">{{ stat.total_usage|floatformat:1 }}</h4>
+                        <small class="text-muted">Total Usage</small>
+                        <div class="mt-2">
+                            <strong class="text-success">${{ stat.total_cost|floatformat:2 }}</strong>
+                            <small class="text-muted">/ month</small>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        {% with efficiency_data.items as efficiency_items %}
+                        {% for utility_type, efficiency in efficiency_items %}
+                        {% if efficiency and stat.utility_type == utility_type %}
+                        <span class="badge bg-{% if efficiency.rating == 'Excellent' %}success{% elif efficiency.rating == 'Good' %}info{% elif efficiency.rating == 'Average' %}warning{% else %}danger{% endif %}">
+                            {{ efficiency.rating }}
+                        </span>
+                        {% endif %}
+                        {% endfor %}
+                        {% endwith %}
+                        <div class="mt-1">
+                            <small class="text-muted">{{ stat.reading_count }} readings</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                <h5>No utility data for this month</h5>
+                <p class="text-muted">Start by adding your first utility reading</p>
+                <a href="{% url 'utility_management' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Add Reading
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if recent_readings %}
+<div class="row mt-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-history me-2"></i>Recent Readings
+                </h5>
+                <a href="{% url 'utility_management' %}" class="btn btn-sm btn-outline-primary">
+                    View All
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Value</th>
+                                <th>Cost</th>
+                                <th>Date</th>
+                                <th>Location</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for reading in recent_readings %}
+                            <tr>
+                                <td>
+                                    {% if reading.utility_type == 'electricity' %}
+                                        <i class="fas fa-bolt text-warning"></i>
+                                    {% elif reading.utility_type == 'gas' %}
+                                        <i class="fas fa-fire text-danger"></i>
+                                    {% elif reading.utility_type == 'steam' %}
+                                        <i class="fas fa-cloud text-secondary"></i>
+                                    {% elif reading.utility_type == 'air_conditioning' %}
+                                        <i class="fas fa-snowflake text-info"></i>
+                                    {% endif %}
+                                    {{ reading.get_utility_type_display }}
+                                </td>
+                                <td>{{ reading.reading_value }} {{ reading.unit }}</td>
+                                <td class="text-success">${{ reading.cost|floatformat:2 }}</td>
+                                <td>{{ reading.reading_date|date:"M d, Y" }}</td>
+                                <td>{{ reading.location }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-pie me-2"></i>Efficiency Overview
+                </h5>
+            </div>
+            <div class="card-body">
+                {% for utility_type, data in efficiency_data.items %}
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h6 class="mb-1">{{ utility_type|title }}</h6>
+                        <small class="text-muted">${{ data.cost|floatformat:2 }} this month</small>
+                    </div>
+                    <span class="badge bg-{% if data.rating == 'Excellent' %}success{% elif data.rating == 'Good' %}info{% elif data.rating == 'Average' %}warning{% else %}danger{% endif %} fs-6">
+                        {{ data.rating }}
+                    </span>
+                </div>
+                {% endfor %}
+                
+                <div class="text-center mt-3">
+                    <a href="{% url 'reports' %}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-chart-bar me-2"></i>View Reports
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-cloud me-2"></i>AWS Integration
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fab fa-aws text-warning me-2"></i>
+                            <small>S3 Storage</small>
+                        </div>
+                        <span class="badge bg-success">Active</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-database text-primary me-2"></i>
+                            <small>RDS MySQL</small>
+                        </div>
+                        <span class="badge bg-success">Connected</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-envelope text-info me-2"></i>
+                            <small>SES Email</small>
+                        </div>
+                        <span class="badge bg-success">Ready</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-bell text-warning me-2"></i>
+                            <small>SNS Notifications</small>
+                        </div>
+                        <span class="badge bg-success">Enabled</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-chart-line text-secondary me-2"></i>
+                            <small>CloudWatch</small>
+                        </div>
+                        <span class="badge bg-success">Monitoring</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5>Quick Actions</h5>
+                <div class="row mt-3">
+                    <div class="col-6 col-md-3 mb-2">
+                        <a href="{% url 'utility_management' %}" class="btn btn-outline-primary w-100">
+                            <i class="fas fa-plus d-block mb-2"></i>
+                            Add Reading
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-3 mb-2">
+                        <a href="{% url 'reports' %}" class="btn btn-outline-success w-100">
+                            <i class="fas fa-chart-bar d-block mb-2"></i>
+                            Generate Report
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-3 mb-2">
+                        <a href="{% url 'profile' %}" class="btn btn-outline-info w-100">
+                            <i class="fas fa-user d-block mb-2"></i>
+                            Update Profile
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-3 mb-2">
+                        <button class="btn btn-outline-secondary w-100" onclick="location.reload()">
+                            <i class="fas fa-sync-alt d-block mb-2"></i>
+                            Refresh Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Add a simple lookup filter for template
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-refresh every 5 minutes
+    setTimeout(function() {
+        location.reload();
+    }, 300000);
+});
+</script>
+{% endblock %}

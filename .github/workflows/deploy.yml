@@ -1,0 +1,277 @@
+name: Deploy Django EGSA App to EC2
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run Django tests
+      run: |
+        cd myproject
+        python manage.py test
+      env:
+        DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+    
+    - name: Check Django deployment readiness
+      run: |
+        cd myproject
+        python manage.py check --deploy
+      env:
+        DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+    
+    - name: Deploy to EC2
+      run: |
+        ssh -i ~/.ssh/id_rsa ec2-user@${{ secrets.EC2_HOST }} << 'EOF'
+          set -e
+          
+          echo "🚀 Starting deployment process..."
+          
+          # Stop existing Django application
+          echo "⏹️ Stopping existing Django application..."
+          pkill -f "python.*manage.py.*runserver" || true
+          pkill -f "gunicorn" || true
+          sleep 5
+          
+          # Remove existing project directory
+          echo "🗑️ Removing old project files..."
+          rm -rf ~/myproject || true
+          
+          # Clone the repository
+          echo "📥 Cloning repository..."
+          cd ~
+          git clone https://github.com/${{ github.repository }}.git temp_repo
+          cp -r temp_repo/myproject ~/myproject
+          rm -rf temp_repo
+          
+          # Navigate to project directory
+          cd ~/myproject
+          
+          # Create virtual environment if it doesn't exist
+          echo "🐍 Setting up Python virtual environment..."
+          if [ ! -d "venv" ]; then
+            python3 -m venv venv
+          fi
+          
+          # Activate virtual environment
+          source venv/bin/activate
+          
+          # Upgrade pip
+          echo "📦 Upgrading pip..."
+          pip install --upgrade pip
+          
+          # Install dependencies
+          echo "📚 Installing dependencies..."
+          pip install -r ../requirements.txt
+          
+          # Install additional production packages
+          pip install gunicorn whitenoise
+          
+          # Create .env file with secrets
+          echo "🔐 Setting up environment variables..."
+          cat > .env << 'ENV_EOF'
+        DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+        DEBUG=False
+        ALLOWED_HOSTS=${{ secrets.EC2_HOST }},localhost,127.0.0.1
+        
+        # AWS Configuration
+        AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_DEFAULT_REGION=eu-north-1
+        AWS_S3_BUCKET_NAME=radha-file-storage-20250731171508
+        AWS_RDS_ENDPOINT=radha-mysql-production.c7aumg0qarr1.eu-north-1.rds.amazonaws.com
+        AWS_RDS_USERNAME=radhaadmin
+        AWS_RDS_PASSWORD=${{ secrets.AWS_RDS_PASSWORD }}
+        AWS_RDS_DATABASE=radha_production_db
+        AWS_SES_EMAIL=serafinns13@gmail.com
+        AWS_SNS_CRITICAL_TOPIC=arn:aws:sns:eu-north-1:623849686048:radha-critical-events
+        AWS_SNS_GENERAL_TOPIC=arn:aws:sns:eu-north-1:623849686048:radha-general-notifications
+        ENV_EOF
+          
+          # Run database migrations
+          echo "🗄️ Running database migrations..."
+          python manage.py makemigrations
+          python manage.py migrate
+          
+          # Collect static files
+          echo "📁 Collecting static files..."
+          python manage.py collectstatic --noinput
+          
+          # Create superuser if it doesn't exist
+          echo "👤 Creating/updating admin user..."
+          python manage.py shell << 'PYTHON_EOF'
+        from django.contrib.auth.models import User
+        username = 'admin'
+        email = 'serafinns13@gmail.com'
+        password = 'admin123'
+        
+        if User.objects.filter(username=username).exists():
+            user = User.objects.get(username=username)
+            user.set_password(password)
+            user.save()
+            print(f"Updated existing user: {username}")
+        else:
+            User.objects.create_superuser(username, email, password)
+            print(f"Created new superuser: {username}")
+        PYTHON_EOF
+          
+          # Create sample data
+          echo "📊 Creating sample data..."
+          python manage.py shell << 'PYTHON_EOF'
+        from egsa.models import UtilityReading, UserProfile
+        from django.contrib.auth.models import User
+        from datetime import datetime, timedelta
+        import random
+        
+        # Get or create test user
+        try:
+            test_user = User.objects.get(username='testuser')
+        except User.DoesNotExist:
+            test_user = User.objects.create_user('testuser', 'test@example.com', 'testpass123')
+        
+        # Create user profile
+        profile, created = UserProfile.objects.get_or_create(
+            user=test_user,
+            defaults={'phone_number': '+1234567890', 'address': '123 Main St, City, State'}
+        )
+        
+        # Create sample utility readings if none exist
+        if UtilityReading.objects.count() < 10:
+            utilities = ['electricity', 'gas', 'steam', 'air_conditioning']
+            locations = ['Main Building', 'East Wing', 'West Wing', 'Basement']
+            
+            for i in range(20):
+                utility_type = random.choice(utilities)
+                reading_date = datetime.now() - timedelta(days=random.randint(1, 90))
+                
+                if utility_type == 'electricity':
+                    value = random.uniform(100, 500)
+                    unit = 'kWh'
+                    rate = 0.15
+                elif utility_type == 'gas':
+                    value = random.uniform(50, 200)
+                    unit = 'therms'
+                    rate = 1.2
+                elif utility_type == 'steam':
+                    value = random.uniform(200, 800)
+                    unit = 'lbs'
+                    rate = 0.05
+                else:  # air_conditioning
+                    value = random.uniform(300, 1000)
+                    unit = 'BTU'
+                    rate = 0.08
+                
+                UtilityReading.objects.get_or_create(
+                    user=test_user,
+                    utility_type=utility_type,
+                    reading_value=value,
+                    reading_date=reading_date,
+                    defaults={
+                        'unit': unit,
+                        'cost': value * rate,
+                        'location': random.choice(locations),
+                        'notes': f'Sample {utility_type} reading'
+                    }
+                )
+            print("Sample data created successfully")
+        PYTHON_EOF
+          
+          # Test the application
+          echo "🧪 Testing application startup..."
+          timeout 10s python manage.py runserver 0.0.0.0:8000 &
+          sleep 5
+          
+          # Kill test server
+          pkill -f "python.*manage.py.*runserver" || true
+          
+          # Start the production server with gunicorn
+          echo "🚀 Starting production server..."
+          nohup gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 120 myproject.wsgi:application > ~/deployment.log 2>&1 &
+          
+          # Wait a moment for server to start
+          sleep 5
+          
+          # Check if server is running
+          if pgrep -f gunicorn > /dev/null; then
+            echo "✅ Deployment successful! Server is running on port 8000"
+            echo "🌐 Access the application at: http://${{ secrets.EC2_HOST }}:8000"
+            echo "👤 Admin login: admin / admin123"
+            echo "👤 Test user login: testuser / testpass123"
+          else
+            echo "❌ Deployment failed! Server is not running"
+            echo "📋 Server logs:"
+            tail -20 ~/deployment.log || echo "No logs available"
+            exit 1
+          fi
+          
+          # Deactivate virtual environment
+          deactivate
+          
+          echo "🎉 Deployment completed successfully!"
+        EOF
+    
+    - name: Verify deployment
+      run: |
+        echo "🔍 Verifying deployment..."
+        
+        # Wait for application to fully start
+        sleep 10
+        
+        # Test if the application is responding
+        if curl -f -s http://${{ secrets.EC2_HOST }}:8000 > /dev/null; then
+          echo "✅ Application is responding successfully!"
+          echo "🌐 You can access your Django EGSA app at: http://${{ secrets.EC2_HOST }}:8000"
+        else
+          echo "⚠️ Application might still be starting up or there's an issue"
+          echo "Please check the server logs on EC2"
+        fi
+
+  notify:
+    needs: [test, deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Notify deployment status
+      run: |
+        if [ "${{ needs.deploy.result }}" == "success" ]; then
+          echo "🎉 Deployment successful!"
+          echo "✅ Django EGSA application is now live at http://${{ secrets.EC2_HOST }}:8000"
+          echo "📱 Admin panel: http://${{ secrets.EC2_HOST }}:8000/admin"
+          echo "👤 Login with: admin / admin123"
+        else
+          echo "❌ Deployment failed!"
+          echo "Please check the workflow logs for details"
+        fi
